@@ -1,0 +1,15 @@
+k8s-vtab
+.DS_Store
+
+
+# Added by cargo
+
+/target
+:memory
+
+
+# Added by cargo
+#
+# already existing elements were commented out
+
+#/target
