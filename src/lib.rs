@@ -1,9 +1,10 @@
 use std::{mem, os::raw::c_int};
 
 use sqlite_loadable::{
-    api, define_virtual_table, prelude::*,
+    api, define_virtual_table,
+    prelude::*,
     table::{BestIndexError, IndexInfo, VTab, VTabArguments, VTabCursor},
-    Result,
+    vtab_argparse, Result,
 };
 
 // 1. Define your table structure
@@ -19,14 +20,30 @@ impl<'vtab> VTab<'vtab> for KubernetesTable {
     fn connect(
         _db: *mut sqlite3,
         _aux: Option<&Self::Aux>,
-        _args: VTabArguments,
+        args: VTabArguments,
     ) -> Result<(String, Self)> {
         // Define the SQL schema your virtual table exposes
-        let schema = "CREATE TABLE x(id INTEGER, data TEXT);";
+        // dbg!(args.arguments);
+        let arguments = args
+            .arguments
+            .iter()
+            .map(|arg| vtab_argparse::parse_argument(arg).unwrap())
+            .collect::<Vec<vtab_argparse::Argument>>();
+        // dbg!(arguments);
+        // require `resource` argument, as that's how we know if it's Pods/Deployments/etc
+        if arguments.iter().all(|arg| match arg {
+            vtab_argparse::Argument::Config(config) => config.key != "resource",
+            _ => false,
+        }) {
+            return Err(sqlite_loadable::Error::new(
+                sqlite_loadable::ErrorKind::Message("`resource` argument is required".to_string()),
+            ));
+        }
+        let schema = format!("CREATE TABLE x(id INTEGER, data TEXT);");
         let vtab = KubernetesTable {
             base: unsafe { mem::zeroed() },
         };
-        Ok((schema.to_string(), vtab))
+        Ok((schema, vtab))
     }
 
     fn best_index(&self, _info: IndexInfo) -> core::result::Result<(), BestIndexError> {
