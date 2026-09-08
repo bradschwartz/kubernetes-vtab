@@ -1,16 +1,41 @@
+pub mod pods;
+
 use std::{mem, os::raw::c_int};
 
 use sqlite_loadable::{
     api, define_virtual_table,
     prelude::*,
     table::{BestIndexError, IndexInfo, VTab, VTabArguments, VTabCursor},
-    vtab_argparse, Result,
+    vtab_argparse::{self, ConfigOption, ConfigOptionValue},
+    Result,
 };
 
 // 1. Define your table structure
 #[repr(C)]
 struct KubernetesTable {
     base: sqlite3_vtab,
+}
+
+fn get_resource(arguments: &[vtab_argparse::Argument]) -> Result<&str> {
+    let error = sqlite_loadable::Error::new(sqlite_loadable::ErrorKind::Message(
+        "`resource` argument is required".to_string(),
+    ));
+    // go through arguments and find the one with the key "resource", returning the value
+    // if none exist, return an error
+    let resource = arguments
+        .iter()
+        .find(|arg| match arg {
+            vtab_argparse::Argument::Config(config) => config.key == "resource",
+            _ => false,
+        })
+        .map(|arg| match arg {
+            vtab_argparse::Argument::Config(ConfigOption {
+                value: ConfigOptionValue::Quoted(value),
+                ..
+            }) => value.as_str(),
+            _ => unreachable!(),
+        });
+    resource.ok_or(error)
 }
 
 impl<'vtab> VTab<'vtab> for KubernetesTable {
@@ -31,15 +56,18 @@ impl<'vtab> VTab<'vtab> for KubernetesTable {
             .collect::<Vec<vtab_argparse::Argument>>();
         // dbg!(arguments);
         // require `resource` argument, as that's how we know if it's Pods/Deployments/etc
-        if arguments.iter().all(|arg| match arg {
-            vtab_argparse::Argument::Config(config) => config.key != "resource",
-            _ => false,
-        }) {
-            return Err(sqlite_loadable::Error::new(
-                sqlite_loadable::ErrorKind::Message("`resource` argument is required".to_string()),
-            ));
-        }
-        let schema = format!("CREATE TABLE x(id INTEGER, data TEXT);");
+        let resource = get_resource(&arguments)?;
+        let schema = match resource {
+            "pods" => pods::Pods::schema(),
+            "debug" => {
+                format!("CREATE TABLE x(id INTEGER, data TEXT);")
+            }
+            _ => {
+                return Err(sqlite_loadable::Error::new(
+                    sqlite_loadable::ErrorKind::Message(format!("Unknown resource: {}", resource)),
+                ))
+            }
+        };
         let vtab = KubernetesTable {
             base: unsafe { mem::zeroed() },
         };
