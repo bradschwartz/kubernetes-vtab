@@ -1,4 +1,5 @@
 pub mod pods;
+pub mod debug;
 
 use std::{mem, os::raw::c_int};
 
@@ -59,9 +60,7 @@ impl<'vtab> VTab<'vtab> for KubernetesTable {
         let resource = get_resource(&arguments)?;
         let schema = match resource {
             "pods" => pods::Pods::schema(),
-            "debug" => {
-                format!("CREATE TABLE x(id INTEGER, data TEXT);")
-            }
+            "debug" => debug::Debug::schema(),
             _ => {
                 return Err(sqlite_loadable::Error::new(
                     sqlite_loadable::ErrorKind::Message(format!("Unknown resource: {}", resource)),
