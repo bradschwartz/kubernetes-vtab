@@ -81,42 +81,76 @@ impl<'vtab> VTab<'vtab> for KubernetesTable {
         Ok(KubernetesCursor {
             base: unsafe { mem::zeroed() },
             row_id: 0,
+            resource: "pods".to_string(),
         })
     }
 }
 
 // 2. Define how SQLite iterates through your table rows
+// Using a single cursor that can handle different resources based on the `resource` field
 #[repr(C)]
 struct KubernetesCursor {
     base: sqlite3_vtab_cursor,
     row_id: i64,
+    resource: String,
 }
 
 impl VTabCursor for KubernetesCursor {
     fn filter(
         &mut self,
-        _idx_num: c_int,
-        _idx_str: Option<&str>,
-        _values: &[*mut sqlite3_value],
+        idx_num: c_int,
+        idx_str: Option<&str>,
+        values: &[*mut sqlite3_value],
     ) -> Result<()> {
-        self.row_id = 1; // Reset iterator to start
+        self.row_id = 1;
         Ok(())
     }
 
     fn next(&mut self) -> Result<()> {
-        self.row_id += 1; // Move to the next row
+        self.row_id += 1;
         Ok(())
     }
 
     fn eof(&self) -> bool {
-        self.row_id > 5 // Stop after 5 rows for this dummy example
+        self.row_id > 5
     }
 
     fn column(&self, context: *mut sqlite3_context, i: c_int) -> Result<()> {
         // Output data depending on requested column index `i`
+        // and the resource type stored in the cursor
         match i {
             0 => api::result_int64(context, self.row_id),
-            1 => api::result_text(context, format!("Row number {}", self.row_id))?,
+            1 => {
+                if self.resource == "pods" {
+                    api::result_text(context, format!("namespace-{}", self.row_id))?
+                } else {
+                    api::result_text(context, format!("data-{}", self.row_id))?
+                }
+            }
+            2 => {
+                if self.resource == "pods" {
+                    api::result_text(context, format!("status-{}", self.row_id))?
+                } else {
+                    api::result_text(context, "")?
+                }
+            }
+            3 => {
+                if self.resource == "pods" {
+                    api::result_text(context, format!("age-{}", self.row_id))?
+                } else {
+                    api::result_text(context, "")?
+                }
+            }
+            4 => {
+                api::result_int64(context, 0)
+            }
+            5 => {
+                if self.resource == "pods" {
+                    api::result_text(context, format!("containers-{}", self.row_id))?
+                } else {
+                    api::result_text(context, "")?
+                }
+            }
             _ => (),
         }
         Ok(())
