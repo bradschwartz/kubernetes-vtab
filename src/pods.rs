@@ -25,9 +25,9 @@ pub struct PodsCursor {
 impl VTabCursor for PodsCursor {
     fn filter(
         &mut self,
-        idx_num: c_int,
-        idx_str: Option<&str>,
-        values: &[*mut sqlite3_value],
+        _idx_num: c_int,
+        _idx_str: Option<&str>,
+        _values: &[*mut sqlite3_value],
     ) -> Result<()> {
         self.row_id = 1;
         Ok(())
