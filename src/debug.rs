@@ -17,16 +17,16 @@ impl Debug {
 
 #[repr(C)]
 pub struct DebugCursor {
-    base: sqlite3_vtab_cursor,
-    row_id: i64,
+    pub base: sqlite3_vtab_cursor,
+    pub row_id: i64,
 }
 
 impl VTabCursor for DebugCursor {
     fn filter(
         &mut self,
-        _idx_num: c_int,
-        _idx_str: Option<&str>,
-        _values: &[*mut sqlite3_value],
+        idx_num: c_int,
+        idx_str: Option<&str>,
+        values: &[*mut sqlite3_value],
     ) -> Result<()> {
         self.row_id = 1;
         Ok(())

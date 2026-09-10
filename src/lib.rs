@@ -10,6 +10,8 @@ use sqlite_loadable::{
     vtab_argparse::{self, ConfigOption, ConfigOptionValue},
     Result,
 };
+use crate::pods::PodsCursor;
+use crate::debug::DebugCursor;
 
 // 1. Define your table structure
 #[repr(C)]
@@ -40,6 +42,62 @@ fn get_resource(arguments: &[vtab_argparse::Argument]) -> Result<&str> {
     resource.ok_or(error)
 }
 
+// 2. Define the cursor enum that can be either Pods or Debug cursor
+#[repr(C)]
+enum KubernetesCursor {
+    Pods {
+        base: sqlite3_vtab_cursor,
+        pods_cursor: PodsCursor,
+    },
+    Debug {
+        base: sqlite3_vtab_cursor,
+        debug_cursor: DebugCursor,
+    },
+}
+
+impl VTabCursor for KubernetesCursor {
+    fn filter(
+        &mut self,
+        idx_num: c_int,
+        idx_str: Option<&str>,
+        values: &[*mut sqlite3_value],
+    ) -> Result<()> {
+        match self {
+            KubernetesCursor::Pods { pods_cursor, .. } => pods_cursor.filter(idx_num, idx_str, values),
+            KubernetesCursor::Debug { debug_cursor, .. } => debug_cursor.filter(idx_num, idx_str, values),
+        }
+    }
+
+    fn next(&mut self) -> Result<()> {
+        match self {
+            KubernetesCursor::Pods { pods_cursor, .. } => pods_cursor.next(),
+            KubernetesCursor::Debug { debug_cursor, .. } => debug_cursor.next(),
+        }
+    }
+
+    fn eof(&self) -> bool {
+        match self {
+            KubernetesCursor::Pods { pods_cursor, .. } => pods_cursor.eof(),
+            KubernetesCursor::Debug { debug_cursor, .. } => debug_cursor.eof(),
+        }
+    }
+
+    fn column(&self, context: *mut sqlite3_context, i: c_int) -> Result<()> {
+        match self {
+            KubernetesCursor::Pods { pods_cursor, .. } => pods_cursor.column(context, i),
+            KubernetesCursor::Debug { debug_cursor, .. } => debug_cursor.column(context, i),
+        }
+    }
+
+    fn rowid(&self) -> Result<i64> {
+        match self {
+            KubernetesCursor::Pods { pods_cursor, .. } => pods_cursor.rowid(),
+            KubernetesCursor::Debug { debug_cursor, .. } => debug_cursor.rowid(),
+        }
+    }
+}
+
+// 3. Register the extension initialization hook
 impl<'vtab> VTab<'vtab> for KubernetesTable {
     type Aux = ();
     type Cursor = KubernetesCursor;
@@ -50,13 +108,11 @@ impl<'vtab> VTab<'vtab> for KubernetesTable {
         args: VTabArguments,
     ) -> Result<(String, Self)> {
         // Define the SQL schema your virtual table exposes
-        // dbg!(args.arguments);
         let arguments = args
             .arguments
             .iter()
             .map(|arg| vtab_argparse::parse_argument(arg).unwrap())
             .collect::<Vec<vtab_argparse::Argument>>();
-        // dbg!(arguments);
         // require `resource` argument, as that's how we know if it's Pods/Deployments/etc
         let resource = get_resource(&arguments)?;
         let schema = match resource {
@@ -80,90 +136,28 @@ impl<'vtab> VTab<'vtab> for KubernetesTable {
     }
 
     fn open(&mut self) -> Result<Self::Cursor> {
-        Ok(KubernetesCursor {
-            base: unsafe { mem::zeroed() },
-            row_id: 0,
-            resource: self.resource.clone(),
-        })
-    }
-}
-
-// 2. Define how SQLite iterates through your table rows
-// Using a single cursor that can handle different resources based on the `resource` field
-#[repr(C)]
-struct KubernetesCursor {
-    base: sqlite3_vtab_cursor,
-    row_id: i64,
-    resource: String,
-}
-
-impl VTabCursor for KubernetesCursor {
-    fn filter(
-        &mut self,
-        _idx_num: c_int,
-        _idx_str: Option<&str>,
-        _values: &[*mut sqlite3_value],
-    ) -> Result<()> {
-        self.row_id = 1;
-        Ok(())
-    }
-
-    fn next(&mut self) -> Result<()> {
-        self.row_id += 1;
-        Ok(())
-    }
-
-    fn eof(&self) -> bool {
-        self.row_id > 5
-    }
-
-    fn column(&self, context: *mut sqlite3_context, i: c_int) -> Result<()> {
-        // Output data depending on requested column index `i`
-        // and the resource type stored in the cursor
-        match i {
-            0 => api::result_int64(context, self.row_id),
-            1 => {
-                if self.resource == "pods" {
-                    api::result_text(context, format!("namespace-{}", self.row_id))?
-                } else {
-                    api::result_text(context, format!("data-{}", self.row_id))?
-                }
-            }
-            2 => {
-                if self.resource == "pods" {
-                    api::result_text(context, format!("status-{}", self.row_id))?
-                } else {
-                    api::result_text(context, "")?
-                }
-            }
-            3 => {
-                if self.resource == "pods" {
-                    api::result_text(context, format!("age-{}", self.row_id))?
-                } else {
-                    api::result_text(context, "")?
-                }
-            }
-            4 => {
-                api::result_int64(context, 0)
-            }
-            5 => {
-                if self.resource == "pods" {
-                    api::result_text(context, format!("containers-{}", self.row_id))?
-                } else {
-                    api::result_text(context, "")?
-                }
-            }
-            _ => (),
+        match self.resource.as_str() {
+            "pods" => Ok(KubernetesCursor::Pods {
+                base: unsafe { mem::zeroed() },
+                pods_cursor: PodsCursor {
+                    base: unsafe { mem::zeroed() },
+                    row_id: 0,
+                    restart_count: 0,
+                },
+            }),
+            "debug" => Ok(KubernetesCursor::Debug {
+                base: unsafe { mem::zeroed() },
+                debug_cursor: DebugCursor {
+                    base: unsafe { mem::zeroed() },
+                    row_id: 0,
+                },
+            }),
+            _ => unreachable!(),
         }
-        Ok(())
-    }
-
-    fn rowid(&self) -> Result<i64> {
-        Ok(self.row_id)
     }
 }
 
-// 3. Register the extension initialization hook
+// 4. Register the extension initialization hook
 #[sqlite_entrypoint]
 fn sqlite3_extension_init(db: *mut sqlite3) -> Result<()> {
     define_virtual_table::<KubernetesTable>(db, "kubernetes_vtab", None)?;
