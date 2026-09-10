@@ -15,6 +15,7 @@ use sqlite_loadable::{
 #[repr(C)]
 struct KubernetesTable {
     base: sqlite3_vtab,
+    resource: String,
 }
 
 fn get_resource(arguments: &[vtab_argparse::Argument]) -> Result<&str> {
@@ -69,6 +70,7 @@ impl<'vtab> VTab<'vtab> for KubernetesTable {
         };
         let vtab = KubernetesTable {
             base: unsafe { mem::zeroed() },
+            resource: resource.to_string(),
         };
         Ok((schema, vtab))
     }
@@ -81,7 +83,7 @@ impl<'vtab> VTab<'vtab> for KubernetesTable {
         Ok(KubernetesCursor {
             base: unsafe { mem::zeroed() },
             row_id: 0,
-            resource: "pods".to_string(),
+            resource: self.resource.clone(),
         })
     }
 }
