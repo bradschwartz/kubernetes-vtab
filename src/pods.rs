@@ -89,7 +89,7 @@ impl VTabCursor for PodsCursor {
                     .to_string(),
             )?,
             // restart count
-            3 => api::result_int64(
+            3 => api::result_int(
                 context,
                 current_pod
                     .status
@@ -98,7 +98,9 @@ impl VTabCursor for PodsCursor {
                     .container_statuses
                     .as_ref()
                     .unwrap()
-                    .len() as i64,
+                    .iter()
+                    .map(|s| s.restart_count)
+                    .sum::<i32>(),
             ),
             _ => (),
         }
