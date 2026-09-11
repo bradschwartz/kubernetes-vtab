@@ -29,7 +29,7 @@ impl VTabCursor for PodsCursor {
         _idx_str: Option<&str>,
         _values: &[*mut sqlite3_value],
     ) -> Result<()> {
-        self.row_id = 1;
+        self.row_id = 0;
 
         // this seems to get called a single time when the cursor is created
         // so we should do the fetching here
@@ -63,7 +63,7 @@ impl VTabCursor for PodsCursor {
     }
 
     fn eof(&self) -> bool {
-        self.row_id > 5
+        self.row_id == self.pods.len() as i64
     }
 
     fn column(&self, context: *mut sqlite3_context, i: c_int) -> Result<()> {
