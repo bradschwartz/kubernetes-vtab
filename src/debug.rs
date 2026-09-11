@@ -1,11 +1,6 @@
 use std::os::raw::c_int;
 
-use sqlite_loadable::{
-    api,
-    table::{VTabCursor},
-    prelude::*,
-    Result,
-};
+use sqlite_loadable::{api, prelude::*, table::VTabCursor, Result};
 
 pub struct Debug;
 
