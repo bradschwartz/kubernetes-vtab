@@ -5,11 +5,3 @@ kubernetes-vtab
 # Added by cargo
 
 /target
-:memory
-
-
-# Added by cargo
-#
-# already existing elements were commented out
-
-#/target
