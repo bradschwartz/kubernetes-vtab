@@ -1,17 +1,17 @@
-pub mod pods;
 pub mod debug;
+pub mod pods;
 
 use std::{mem, os::raw::c_int};
 
+use crate::debug::DebugCursor;
+use crate::pods::PodsCursor;
 use sqlite_loadable::{
-    api, define_virtual_table,
+    define_virtual_table,
     prelude::*,
     table::{BestIndexError, IndexInfo, VTab, VTabArguments, VTabCursor},
     vtab_argparse::{self, ConfigOption, ConfigOptionValue},
     Result,
 };
-use crate::pods::PodsCursor;
-use crate::debug::DebugCursor;
 
 // 1. Define your table structure
 #[repr(C)]
@@ -63,8 +63,12 @@ impl VTabCursor for KubernetesCursor {
         values: &[*mut sqlite3_value],
     ) -> Result<()> {
         match self {
-            KubernetesCursor::Pods { pods_cursor, .. } => pods_cursor.filter(idx_num, idx_str, values),
-            KubernetesCursor::Debug { debug_cursor, .. } => debug_cursor.filter(idx_num, idx_str, values),
+            KubernetesCursor::Pods { pods_cursor, .. } => {
+                pods_cursor.filter(idx_num, idx_str, values)
+            }
+            KubernetesCursor::Debug { debug_cursor, .. } => {
+                debug_cursor.filter(idx_num, idx_str, values)
+            }
         }
     }
 
@@ -142,7 +146,7 @@ impl<'vtab> VTab<'vtab> for KubernetesTable {
                 pods_cursor: PodsCursor {
                     base: unsafe { mem::zeroed() },
                     row_id: 0,
-                    restart_count: 0,
+                    pods: vec![],
                 },
             }),
             "debug" => Ok(KubernetesCursor::Debug {
