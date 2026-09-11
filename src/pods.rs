@@ -11,7 +11,7 @@ pub struct Pods;
 
 impl Pods {
     pub fn schema() -> String {
-        format!("CREATE TABLE pods(name TEXT, namespace TEXT, status TEXT, restart_count INTEGER);")
+        "CREATE TABLE pods(name TEXT, namespace TEXT, status TEXT, restart_count INTEGER);".to_string()
     }
 }
 
@@ -38,20 +38,14 @@ impl VTabCursor for PodsCursor {
             .build()
             .unwrap();
         let client = rt
-            .block_on(async { Client::try_default().await })
-            .or_else(|e| {
-                Err(sqlite_loadable::Error::new(
+            .block_on(async { Client::try_default().await }).map_err(|e| sqlite_loadable::Error::new(
                     sqlite_loadable::ErrorKind::Message(format!("Failed to create client: {}", e)),
-                ))
-            })?;
+                ))?;
         let api: Api<Pod> = Api::all(client);
         let pods = rt
-            .block_on(async { api.list(&ListParams::default()).await })
-            .or_else(|e| {
-                Err(sqlite_loadable::Error::new(
+            .block_on(async { api.list(&ListParams::default()).await }).map_err(|e| sqlite_loadable::Error::new(
                     sqlite_loadable::ErrorKind::Message(format!("Failed to list pods: {}", e)),
-                ))
-            })?;
+                ))?;
         self.pods = pods.items;
 
         Ok(())
@@ -85,8 +79,7 @@ impl VTabCursor for PodsCursor {
                     .unwrap()
                     .phase
                     .as_ref()
-                    .unwrap()
-                    .to_string(),
+                    .unwrap(),
             )?,
             // restart count
             3 => api::result_int(

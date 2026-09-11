@@ -6,7 +6,7 @@ pub struct Debug;
 
 impl Debug {
     pub fn schema() -> String {
-        format!("CREATE TABLE debug(id INTEGER, data TEXT);")
+        "CREATE TABLE debug(id INTEGER, data TEXT);".to_string()
     }
 }
 
