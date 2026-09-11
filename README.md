@@ -10,7 +10,7 @@ of data by default.
 ```bash
 $ cargo build --release
 # Start a sqlite session
-$ /opt/homebrew/opt/sqlite/bin/sqlite3  :memory
+$ /opt/homebrew/opt/sqlite/bin/sqlite3  :memory:
 sqlite> .load target/release/libkubernetes_vtab.dylib
 sqlite> CREATE VIRTUAL TABLE pods USING kubernetes_vtab(resource='pods');
 -- load some data!
