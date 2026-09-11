@@ -46,10 +46,12 @@ fn get_resource(arguments: &[vtab_argparse::Argument]) -> Result<&str> {
 #[repr(C)]
 enum KubernetesCursor {
     Pods {
+        #[allow(dead_code)]
         base: sqlite3_vtab_cursor,
         pods_cursor: PodsCursor,
     },
     Debug {
+        #[allow(dead_code)]
         base: sqlite3_vtab_cursor,
         debug_cursor: DebugCursor,
     },
