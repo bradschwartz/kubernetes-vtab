@@ -11,7 +11,8 @@ pub struct Pods;
 
 impl Pods {
     pub fn schema() -> String {
-        "CREATE TABLE pods(name TEXT, namespace TEXT, status TEXT, restart_count INTEGER);".to_string()
+        "CREATE TABLE pods(name TEXT, namespace TEXT, status TEXT, restart_count INTEGER);"
+            .to_string()
     }
 }
 
@@ -38,14 +39,22 @@ impl VTabCursor for PodsCursor {
             .build()
             .unwrap();
         let client = rt
-            .block_on(async { Client::try_default().await }).map_err(|e| sqlite_loadable::Error::new(
-                    sqlite_loadable::ErrorKind::Message(format!("Failed to create client: {}", e)),
-                ))?;
+            .block_on(async { Client::try_default().await })
+            .map_err(|e| {
+                sqlite_loadable::Error::new(sqlite_loadable::ErrorKind::Message(format!(
+                    "Failed to create client: {}",
+                    e
+                )))
+            })?;
         let api: Api<Pod> = Api::all(client);
         let pods = rt
-            .block_on(async { api.list(&ListParams::default()).await }).map_err(|e| sqlite_loadable::Error::new(
-                    sqlite_loadable::ErrorKind::Message(format!("Failed to list pods: {}", e)),
-                ))?;
+            .block_on(async { api.list(&ListParams::default()).await })
+            .map_err(|e| {
+                sqlite_loadable::Error::new(sqlite_loadable::ErrorKind::Message(format!(
+                    "Failed to list pods: {}",
+                    e
+                )))
+            })?;
         self.pods = pods.items;
 
         Ok(())
@@ -73,13 +82,7 @@ impl VTabCursor for PodsCursor {
             // status
             2 => api::result_text(
                 context,
-                current_pod
-                    .status
-                    .as_ref()
-                    .unwrap()
-                    .phase
-                    .as_ref()
-                    .unwrap(),
+                current_pod.status.as_ref().unwrap().phase.as_ref().unwrap(),
             )?,
             // restart count
             3 => api::result_int(
