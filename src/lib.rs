@@ -1,9 +1,11 @@
 pub mod debug;
+pub mod deployments;
 pub mod pods;
 
 use std::{mem, os::raw::c_int};
 
 use crate::debug::DebugCursor;
+use crate::deployments::DeploymentsCursor;
 use crate::pods::PodsCursor;
 use sqlite_loadable::{
     define_virtual_table,
@@ -55,6 +57,11 @@ enum KubernetesCursor {
         base: sqlite3_vtab_cursor,
         debug_cursor: DebugCursor,
     },
+    Deployments {
+        #[allow(dead_code)]
+        base: sqlite3_vtab_cursor,
+        deployments_cursor: DeploymentsCursor,
+    },
 }
 
 impl VTabCursor for KubernetesCursor {
@@ -71,6 +78,9 @@ impl VTabCursor for KubernetesCursor {
             KubernetesCursor::Debug { debug_cursor, .. } => {
                 debug_cursor.filter(idx_num, idx_str, values)
             }
+            KubernetesCursor::Deployments {
+                deployments_cursor, ..
+            } => deployments_cursor.filter(idx_num, idx_str, values),
         }
     }
 
@@ -78,6 +88,9 @@ impl VTabCursor for KubernetesCursor {
         match self {
             KubernetesCursor::Pods { pods_cursor, .. } => pods_cursor.next(),
             KubernetesCursor::Debug { debug_cursor, .. } => debug_cursor.next(),
+            KubernetesCursor::Deployments {
+                deployments_cursor, ..
+            } => deployments_cursor.next(),
         }
     }
 
@@ -85,6 +98,9 @@ impl VTabCursor for KubernetesCursor {
         match self {
             KubernetesCursor::Pods { pods_cursor, .. } => pods_cursor.eof(),
             KubernetesCursor::Debug { debug_cursor, .. } => debug_cursor.eof(),
+            KubernetesCursor::Deployments {
+                deployments_cursor, ..
+            } => deployments_cursor.eof(),
         }
     }
 
@@ -92,6 +108,9 @@ impl VTabCursor for KubernetesCursor {
         match self {
             KubernetesCursor::Pods { pods_cursor, .. } => pods_cursor.column(context, i),
             KubernetesCursor::Debug { debug_cursor, .. } => debug_cursor.column(context, i),
+            KubernetesCursor::Deployments {
+                deployments_cursor, ..
+            } => deployments_cursor.column(context, i),
         }
     }
 
@@ -99,6 +118,9 @@ impl VTabCursor for KubernetesCursor {
         match self {
             KubernetesCursor::Pods { pods_cursor, .. } => pods_cursor.rowid(),
             KubernetesCursor::Debug { debug_cursor, .. } => debug_cursor.rowid(),
+            KubernetesCursor::Deployments {
+                deployments_cursor, ..
+            } => deployments_cursor.rowid(),
         }
     }
 }
@@ -123,6 +145,7 @@ impl<'vtab> VTab<'vtab> for KubernetesTable {
         let resource = get_resource(&arguments)?;
         let schema = match resource {
             "pods" => pods::Pods::schema(),
+            "deployments" | "deploy" => deployments::Deployments::schema(),
             "debug" => debug::Debug::schema(),
             _ => {
                 return Err(sqlite_loadable::Error::new(
@@ -149,6 +172,14 @@ impl<'vtab> VTab<'vtab> for KubernetesTable {
                     base: unsafe { mem::zeroed() },
                     row_id: 0,
                     pods: vec![],
+                },
+            }),
+            "deployments" | "deploy" => Ok(KubernetesCursor::Deployments {
+                base: unsafe { mem::zeroed() },
+                deployments_cursor: DeploymentsCursor {
+                    base: unsafe { mem::zeroed() },
+                    row_id: 0,
+                    deployments: vec![],
                 },
             }),
             "debug" => Ok(KubernetesCursor::Debug {
