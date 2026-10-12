@@ -14,7 +14,7 @@ $ /opt/homebrew/opt/sqlite/bin/sqlite3  :memory:
 sqlite> .load target/release/libkubernetes_vtab.dylib
 sqlite> CREATE VIRTUAL TABLE pods USING kubernetes_vtab(resource='pods');
 -- load some data!
-sqlite> select * from test_tab ;
+sqlite> select * from pods ;
 ╭─────────────────────────────────────────────────────────────────┬─────────────┬─────────┬───────────────╮
 │                              name                               │  namespace  │ status  │ restart_count │
 ╞═════════════════════════════════════════════════════════════════╪═════════════╪═════════╪═══════════════╡
@@ -29,7 +29,7 @@ sqlite> select * from test_tab ;
 │ metrics-server-786d997795-pr5gs                                 │ kube-system │ Running │             1 │
 │ operator-67f649cf9d-vpxnn                                       │ tailscale   │ Running │             1 │
 ╰─────────────────────────────────────────────────────────────────┴─────────────┴─────────┴───────────────╯
-sqlite> select count(*) from test_tab ;
+sqlite> select count(*) from pods ;
 ╭──────────╮
 │ count(*) │
 ╞══════════╡
